@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shivarama SOC — Agentic Operations Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B1220; --panel:#101A2D; --panel-2:#0D1626; --line:#22304A;
+    --text:#D7E0EE; --muted:#7C8BA3;
+    --alert:#FF9F45; --critical:#FF5C5C; --ok:#43D9A3; --info:#5FA8FF; --purple:#B58CFF;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:var(--ink); color:var(--text);
+    font-family:'IBM Plex Sans',system-ui,sans-serif; font-size:14px; line-height:1.55;
+    -webkit-font-smoothing:antialiased; min-height:100vh;
+  }
+  .display{font-family:'Archivo',sans-serif;font-stretch:125%;font-weight:700;letter-spacing:-.01em}
+  .mono{font-family:'IBM Plex Mono',monospace}
+  button{font-family:inherit;cursor:pointer}
+  :focus-visible{outline:2px solid var(--info);outline-offset:2px}
+
+  /* ---------- Top bar ---------- */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;height:58px;border-bottom:1px solid var(--line);
+    background:var(--panel-2);position:sticky;top:0;z-index:40;
+  }
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(67,217,163,.14);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(67,217,163,.4)}50%{box-shadow:0 0 0 6px rgba(67,217,163,0)}}
+  .logo b{font-family:'Archivo',sans-serif;font-stretch:125%;font-size:15px;font-weight:700;letter-spacing:.02em}
+  .logo span{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);border-left:1px solid var(--line);padding-left:10px;margin-left:2px}
+  .topstats{display:flex;gap:22px}
+  .topstat{text-align:right}
+  .topstat .v{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:500}
+  .topstat .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+
+  /* ---------- Layout ---------- */
+  .layout{display:grid;grid-template-columns:280px 1fr 360px;min-height:calc(100vh - 58px)}
+  .col{border-right:1px solid var(--line);min-width:0}
+  .col:last-child{border-right:none}
+  .col-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;border-bottom:1px solid var(--line);
+  }
+  .col-head h2{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .col-body{padding:14px 16px;overflow-y:auto}
+
+  .btn{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:500;
+    padding:7px 13px;border-radius:4px;border:1px solid var(--line);
+    background:transparent;color:var(--text);transition:all .15s;
+  }
+  .btn:hover{border-color:var(--muted)}
+  .btn-accent{border-color:var(--alert);color:var(--alert)}
+  .btn-accent:hover{background:var(--alert);color:var(--ink)}
+  .btn-ok{border-color:var(--ok);color:var(--ok)}
+  .btn-ok:hover{background:var(--ok);color:var(--ink)}
+  .btn-sm{padding:4px 9px;font-size:10.5px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ---------- Clients ---------- */
+  .client{
+    border:1px solid var(--line);border-radius:6px;background:var(--panel);
+    padding:13px 14px;margin-bottom:10px;
+  }
+  .client .name{font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:space-between}
+  .client .meta{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .client .agents-line{font-family:'IBM Plex Mono',monospace;font-size:10.5px;margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:2px 7px;border-radius:3px;border:1px solid var(--line);color:var(--muted)}
+  .chip.app{border-color:rgba(95,168,255,.4);color:var(--info)}
+  .chip.work{border-color:rgba(255,159,69,.4);color:var(--alert)}
+  .health{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .h-ok{background:var(--ok)} .h-warn{background:var(--alert)} .h-crit{background:var(--critical);animation:pulse 1.2s infinite}
+
+  .add-form{border:1px dashed var(--line);border-radius:6px;padding:12px;margin-bottom:12px}
+  .add-form input,select{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
+    color:var(--text);padding:7px 9px;font-size:13px;font-family:inherit;margin-bottom:8px;
+  }
+
+  /* ---------- Agents grid ---------- */
+  .agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .agent{
+    border:1px solid var(--line);border-radius:6px;background:var(--panel);
+    padding:14px;position:relative;overflow:hidden;
+  }
+  .agent.coordinator{border-color:rgba(181,140,255,.45);grid-column:1 / -1;background:linear-gradient(180deg,rgba(181,140,255,.05),var(--panel))}
+  .agent-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .agent-type{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+  .t-app{color:var(--info)} .t-work{color:var(--alert)} .t-coord{color:var(--purple)}
+  .agent-name{font-weight:600;font-size:14.5px}
+  .agent .target{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .agent .last{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);min-height:32px;line-height:1.5;border-top:1px solid var(--line);padding-top:8px}
+  .agent .last b{color:var(--text);font-weight:500}
+  .status{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 7px;border-radius:3px}
+  .s-active{color:var(--ok);border:1px solid rgba(67,217,163,.35)}
+  .s-busy{color:var(--alert);border:1px solid rgba(255,159,69,.35)}
+  .s-paused{color:var(--muted);border:1px solid var(--line)}
+  .scanbar{position:absolute;left:0;top:0;height:2px;width:100%;background:linear-gradient(90deg,transparent,var(--info),transparent);transform:translateX(-100%);animation:scan 3s linear infinite}
+  .agent.coordinator .scanbar{background:linear-gradient(90deg,transparent,var(--purple),transparent)}
+  @keyframes scan{to{transform:translateX(100%)}}
+  .agent .row-actions{margin-top:10px;display:flex;gap:6px}
+
+  /* ---------- Coordinator panel ---------- */
+  .coord-out{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
+    padding:12px;font-size:13px;margin-top:10px;white-space:pre-wrap;
+    max-height:300px;overflow-y:auto;line-height:1.6;
+  }
+  .coord-out.empty{color:var(--muted);font-style:italic}
+  .thinking{color:var(--purple);font-family:'IBM Plex Mono',monospace;font-size:12px}
+  .thinking::after{content:"";animation:dots 1.2s steps(4,end) infinite}
+  @keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
+  /* ---------- Feed ---------- */
+  .feed{font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.7}
+  .feed-row{padding:7px 0;border-bottom:1px solid rgba(34,48,74,.6);display:flex;gap:9px;animation:rowIn .25s ease}
+  @keyframes rowIn{from{opacity:0;transform:translateY(3px)}to{opacity:1}}
+  .feed-row .t{color:#54627d;flex-shrink:0}
+  .sev{flex-shrink:0;width:42px}
+  .sev-crit{color:var(--critical)} .sev-high{color:var(--alert)} .sev-info{color:var(--info)} .sev-ok{color:var(--ok)} .sev-coord{color:var(--purple)}
+  .feed-row .m{word-break:break-word}
+
+  .findings-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .fs{border:1px solid var(--line);border-radius:5px;padding:9px 11px;background:var(--panel)}
+  .fs .v{font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:500}
+  .fs .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+  .fs.crit .v{color:var(--critical)} .fs.high .v{color:var(--alert)} .fs.resolved .v{color:var(--ok)}
+
+  @media(max-width:1100px){
+    .layout{grid-template-columns:1fr}
+    .col{border-right:none;border-bottom:1px solid var(--line)}
+    .col-body{max-height:520px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .scanbar,.logo-dot,.h-crit{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-dot" aria-hidden="true"></span>
+    <b>SHIVARAMA SOC</b>
+    <span>agentic-ops/console v2.1</span>
+  </div>
+  <div class="topstats">
+    <div class="topstat"><div class="v" id="ts-agents">0</div><div class="l">Agents online</div></div>
+    <div class="topstat"><div class="v" id="ts-clients">0</div><div class="l">Clients</div></div>
+    <div class="topstat"><div class="v" id="ts-open" style="color:var(--alert)">0</div><div class="l">Open findings</div></div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ============ CLIENTS ============ -->
+  <div class="col">
+    <div class="col-head">
+      <h2>Clients</h2>
+      <button class="btn btn-sm" id="btn-add-client">+ Add</button>
+    </div>
+    <div class="col-body">
+      <div class="add-form" id="client-form" style="display:none">
+        <input id="cf-name" type="text" placeholder="Client name" aria-label="Client name">
+        <input id="cf-sector" type="text" placeholder="Sector (e.g. Finance)" aria-label="Sector">
+        <button class="btn btn-ok btn-sm" id="cf-save" style="width:100%">Create client</button>
+      </div>
+      <div id="client-list"></div>
+    </div>
+  </div>
+
+  <!-- ============ AGENTS ============ -->
+  <div class="col">
+    <div class="col-head">
+      <h2>Agent fleet</h2>
+      <button class="btn btn-accent btn-sm" id="btn-deploy">+ Deploy agent</button>
+    </div>
+    <div class="col-body">
+      <div class="add-form" id="agent-form" style="display:none">
+        <select id="af-type" aria-label="Agent type">
+          <option value="app">Application Monitor — watches app health, errors, auth anomalies</option>
+          <option value="work">Workload Monitor — watches infra, containers, cloud workloads</option>
+        </select>
+        <select id="af-client" aria-label="Assign to client"></select>
+        <input id="af-target" type="text" placeholder="Target (e.g. payments-api, k8s-prod-cluster)" aria-label="Target">
+        <button class="btn btn-ok btn-sm" id="af-save" style="width:100%">Deploy agent</button>
+      </div>
+      <div class="agents-grid" id="agents-grid"></div>
+    </div>
+  </div>
+
+  <!-- ============ FEED ============ -->
+  <div class="col">
+    <div class="col-head"><h2>Unified activity stream</h2></div>
+    <div class="col-body">
+      <div class="findings-summary">
+        <div class="fs crit"><div class="v" id="f-crit">0</div><div class="l">Critical</div></div>
+        <div class="fs high"><div class="v" id="f-high">0</div><div class="l">High</div></div>
+        <div class="fs resolved"><div class="v" id="f-res">0</div><div class="l">Resolved</div></div>
+      </div>
+      <div class="feed" id="feed" role="log" aria-live="off"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   Sentinel SOC — Agentic Operations Console
+   - Clients: assignable entities
+   - Agents: app monitors, workload monitors (simulated telemetry)
+   - Coordinator: a real AI agent (Claude API) that reviews all agent
+     findings and produces prioritized coordination directives.
+   All state lives in memory.
+===================================================================== */
+
+const state = {
+  clients: [],
+  agents: [],
+  findings: [],     // {id, sev, msg, agentId, clientId, resolved, t}
+  feed: [],
+  resolvedCount: 0,
+  nextId: 1,
+};
+
+const $ = id => document.getElementById(id);
+const now = () => new Date().toTimeString().slice(0,8);
+const uid = () => state.nextId++;
+
+/* ---------------- Seed data ---------------- */
+function seed(){
+  const c1 = addClient('Northbridge Bank','Finance',true);
+  const c2 = addClient('MedCare Health','Healthcare',true);
+  const c3 = addClient('VoltGrid Energy','Utilities',true);
+  addAgent('app',  c1.id, 'payments-api', true);
+  addAgent('work', c1.id, 'aws-prod-vpc', true);
+  addAgent('app',  c2.id, 'patient-portal', true);
+  addAgent('work', c2.id, 'k8s-clinical-cluster', true);
+  addAgent('app',  c3.id, 'scada-gateway-ui', true);
+  addCoordinator();
+}
+
+/* ---------------- Clients ---------------- */
+function addClient(name, sector, silent){
+  const c = { id: uid(), name, sector };
+  state.clients.push(c);
+  if(!silent) pushFeed('ok','SYSTEM',`client onboarded · ${name}`);
+  render();
+  return c;
+}
+
+/* ---------------- Agents ---------------- */
+const AGENT_NAMES = { app:'AppWatch', work:'LoadSentry' };
+function addAgent(type, clientId, target, silent){
+  const n = state.agents.filter(a=>a.type===type).length + 1;
+  const a = {
+    id: uid(), type, clientId, target,
+    name: `${AGENT_NAMES[type]}-${String(n).padStart(2,'0')}`,
+    status:'active', last:'initializing telemetry pipeline…', paused:false,
+  };
+  state.agents.push(a);
+  if(!silent){
+    const c = clientById(clientId);
+    pushFeed('info', a.name, `deployed → ${c?c.name:'?'} / ${target}`);
+  }
+  render();
+  return a;
+}
+function addCoordinator(){
+  state.agents.push({
+    id: uid(), type:'coord', clientId:null, target:'all agents · all clients',
+    name:'ORCHESTRATOR-01', status:'active',
+    last:'standing by — run a coordination cycle to triage open findings.',
+    paused:false, output:null, busy:false,
+  });
+}
+const clientById = id => state.clients.find(c=>c.id===id);
+const coordinator = () => state.agents.find(a=>a.type==='coord');
+
+/* ---------------- Telemetry simulation ---------------- */
+const APP_EVENTS = [
+  ['info','latency p95 nominal · {t}'],
+  ['info','error rate 0.02% · within SLO'],
+  ['high','spike in 401 responses · {t} · possible credential stuffing'],
+  ['high','SQLi pattern in WAF logs · {t} · 17 blocked requests'],
+  ['crit','auth bypass attempt detected · {t} · session token replay'],
+  ['ok','anomaly cleared · {t} traffic back to baseline'],
+  ['info','deploy detected · {t} · baselines recalibrating'],
+  ['high','unusual admin login geo · {t}'],
+];
+const WORK_EVENTS = [
+  ['info','node CPU 41% · memory 58% · {t}'],
+  ['info','container fleet healthy · {t}'],
+  ['high','crypto-mining signature on worker node · {t}'],
+  ['crit','privileged container escape attempt · {t}'],
+  ['high','egress to unrecognized ASN · {t} · 2.3 GB'],
+  ['ok','patched node pool verified · {t}'],
+  ['high','IAM role assumed from new principal · {t}'],
+  ['info','autoscaling event · {t} · +3 nodes'],
+];
+
+function tickAgent(a){
+  if(a.paused || a.type==='coord') return;
+  const pool = a.type==='app' ? APP_EVENTS : WORK_EVENTS;
+  const [sev,tpl] = pool[Math.floor(Math.random()*pool.length)];
+  const msg = tpl.replace('{t}', a.target);
+  a.last = msg;
+  a.status = (sev==='crit'||sev==='high') ? 'busy' : 'active';
+  pushFeed(sev, a.name, msg, a.clientId);
+  if(sev==='crit' || sev==='high'){
+    state.findings.push({ id:uid(), sev, msg, agentId:a.id, clientId:a.clientId, resolved:false, t:now() });
+    // Autonomous escalation: critical findings trigger an immediate coordination cycle.
+    if(sev==='crit'){
+      const co = coordinator();
+      if(co && !co.busy) runCoordination();
+    }
+  }
+  if(sev==='ok'){
+    // resolve one open finding for this agent
+    const open = state.findings.find(f=>f.agentId===a.id && !f.resolved);
+    if(open){ open.resolved=true; state.resolvedCount++; }
+  }
+  render();
+}
+
+let tickTimer = setInterval(()=>{
+  const live = state.agents.filter(a=>a.type!=='coord' && !a.paused);
+  if(!live.length) return;
+  tickAgent(live[Math.floor(Math.random()*live.length)]);
+}, 2600);
+
+/* ---------------- Feed ---------------- */
+function pushFeed(sev, src, msg, clientId){
+  const cName = clientId ? (clientById(clientId)||{}).name : null;
+  state.feed.unshift({ t:now(), sev, src, msg, cName });
+  state.feed = state.feed.slice(0,60);
+  renderFeed();
+}
+
+/* ---------------- Coordinator (built-in correlation engine — 100% free, runs in browser, no API) ---------------- */
+const SEV_WEIGHT = { crit:100, high:40 };
+const CATEGORY_RULES = [
+  { key:'credential',  rx:/credential|401|auth bypass|token replay|admin login/i, label:'credential / identity attack' },
+  { key:'injection',   rx:/SQLi|WAF|injection/i,                                  label:'web application attack' },
+  { key:'malware',     rx:/crypto-mining|ransomware|signature/i,                  label:'malware activity' },
+  { key:'escape',      rx:/container escape|privileged/i,                         label:'container compromise' },
+  { key:'exfil',       rx:/egress|unrecognized ASN|GB/i,                          label:'possible data exfiltration' },
+  { key:'iam',         rx:/IAM role|new principal/i,                              label:'cloud identity abuse' },
+];
+const PLAYBOOKS = {
+  credential:'enforce MFA, reset affected credentials, block source IPs',
+  injection:'tighten WAF rules, review app input validation, inspect blocked payloads',
+  malware:'isolate the host, capture memory image, run full EDR scan',
+  escape:'cordon the node, rotate cluster secrets, audit pod security policies',
+  exfil:'block destination ASN, snapshot flow logs, identify data scope',
+  iam:'revoke the session, review trust policy, enable CloudTrail alerting',
+  other:'contain affected system and begin standard investigation',
+};
+function categorize(msg){
+  for(const r of CATEGORY_RULES){ if(r.rx.test(msg)) return r; }
+  return { key:'other', label:'uncategorized anomaly' };
+}
+
+function runCoordination(){
+  const co = coordinator();
+  if(co.busy) return;
+  const open = state.findings.filter(f=>!f.resolved);
+  co.busy = true; co.status='busy';
+  co.last = 'coordination cycle in progress';
+  pushFeed('coord', co.name, `coordination cycle started · ${open.length} open finding(s)`);
+  render();
+
+  // Brief delay so the operator sees the cycle run.
+  setTimeout(()=>{
+    co.output = buildBriefing(open);
+    co.last = `cycle complete · ${open.length} finding(s) triaged`;
+    co.busy = false; co.status='active';
+    pushFeed('coord', co.name, 'briefing issued — see coordinator panel');
+    render();
+  }, 900);
+}
+
+function buildBriefing(open){
+  if(!open.length){
+    return 'PRIORITY ASSESSMENT: No open findings. All monitored applications and workloads are within baseline across every client.\n\nTOP ACTIONS:\n1. Maintain current monitoring posture; no escalations required.\n\nCROSS-CLIENT PATTERNS: None observed.';
+  }
+
+  // ---- Score each client by severity-weighted risk ----
+  const byClient = {};
+  open.forEach(f=>{
+    const c = clientById(f.clientId); if(!c) return;
+    byClient[c.id] = byClient[c.id] || { client:c, score:0, findings:[] };
+    byClient[c.id].score += SEV_WEIGHT[f.sev]||10;
+    byClient[c.id].findings.push(f);
+  });
+  const ranked = Object.values(byClient).sort((a,b)=>b.score-a.score);
+  const critCount = open.filter(f=>f.sev==='crit').length;
+
+  const assessment =
+    `PRIORITY ASSESSMENT: ${open.length} open finding(s) across ${ranked.length} client(s) — ${critCount} critical, ${open.length-critCount} high. ` +
+    `Highest risk: ${ranked[0].client.name} (risk score ${ranked[0].score}). ` +
+    (critCount ? 'Critical items require containment before any further investigation.' : 'No critical items; proceed with standard investigation workflow.');
+
+  // ---- Directives: most severe finding per client, ranked, max 4 ----
+  const directives = [];
+  ranked.slice(0,4).forEach(rc=>{
+    const top = rc.findings.sort((a,b)=>(SEV_WEIGHT[b.sev]||0)-(SEV_WEIGHT[a.sev]||0))[0];
+    const ag = state.agents.find(a=>a.id===top.agentId);
+    const cat = categorize(top.msg);
+    directives.push(`${directives.length+1}. [${top.sev.toUpperCase()}] ${ag?ag.name:'AGENT'} @ ${rc.client.name}: ${cat.label} — ${PLAYBOOKS[cat.key]}.`);
+  });
+
+  // ---- Cross-client correlation: same category appearing at 2+ clients ----
+  const catClients = {};
+  open.forEach(f=>{
+    const cat = categorize(f.msg);
+    const c = clientById(f.clientId); if(!c) return;
+    catClients[cat.key] = catClients[cat.key] || { label:cat.label, clients:new Set() };
+    catClients[cat.key].clients.add(c.name);
+  });
+  const patterns = Object.values(catClients).filter(p=>p.clients.size>=2)
+    .map(p=>`${p.label} observed at ${[...p.clients].join(' and ')} — possible coordinated campaign; share indicators between client environments`);
+
+  return `${assessment}\n\nTOP ACTIONS:\n${directives.join('\n')}\n\nCROSS-CLIENT PATTERNS: ${patterns.length?patterns.join('. ')+'.':'None observed — activity appears isolated per client.'}`;
+}
+
+function resolveAll(){
+  let n=0;
+  state.findings.forEach(f=>{ if(!f.resolved){ f.resolved=true; n++; state.resolvedCount++; }});
+  if(n) pushFeed('ok','SYSTEM',`${n} finding(s) marked resolved by operator`);
+  render();
+}
+
+/* ---------------- Rendering ---------------- */
+function render(){
+  renderClients(); renderAgents(); renderTop(); renderFindings();
+}
+function renderTop(){
+  $('ts-agents').textContent = state.agents.filter(a=>!a.paused).length;
+  $('ts-clients').textContent = state.clients.length;
+  $('ts-open').textContent = state.findings.filter(f=>!f.resolved).length;
+}
+function renderFindings(){
+  const open = state.findings.filter(f=>!f.resolved);
+  $('f-crit').textContent = open.filter(f=>f.sev==='crit').length;
+  $('f-high').textContent = open.filter(f=>f.sev==='high').length;
+  $('f-res').textContent  = state.resolvedCount;
+}
+function clientHealth(c){
+  const open = state.findings.filter(f=>f.clientId===c.id && !f.resolved);
+  if(open.some(f=>f.sev==='crit')) return 'h-crit';
+  if(open.length) return 'h-warn';
+  return 'h-ok';
+}
+function renderClients(){
+  const el = $('client-list'); el.innerHTML='';
+  state.clients.forEach(c=>{
+    const agents = state.agents.filter(a=>a.clientId===c.id);
+    const div = document.createElement('div');
+    div.className='client';
+    div.innerHTML = `
+      <div class="name"><span>${esc(c.name)}</span><span class="health ${clientHealth(c)}" title="client health"></span></div>
+      <div class="meta">${esc(c.sector)} · ${agents.length} agent(s) assigned</div>
+      <div class="agents-line">${agents.map(a=>`<span class="chip ${a.type}">${esc(a.name)}</span>`).join('') || '<span class="chip">no agents</span>'}</div>`;
+    el.appendChild(div);
+  });
+}
+function renderAgents(){
+  const grid = $('agents-grid'); grid.innerHTML='';
+  // coordinator first
+  const co = coordinator();
+  if(co){
+    const d = document.createElement('div');
+    d.className='agent coordinator';
+    d.innerHTML = `
+      <div class="scanbar" aria-hidden="true"></div>
+      <div class="agent-top">
+        <div>
+          <div class="agent-type t-coord">Coordinator agent · autonomous</div>
+          <div class="agent-name">${co.name}</div>
+        </div>
+        <span class="status ${co.busy?'s-busy':'s-active'}">${co.busy?'COORDINATING':'ACTIVE'}</span>
+      </div>
+      <div class="target">Oversees ${state.agents.length-1} agents across ${state.clients.length} clients · correlates findings, sets priorities, issues directives</div>
+      <div class="row-actions">
+        <button class="btn btn-sm" id="co-run" style="border-color:var(--purple);color:var(--purple)" ${co.busy?'disabled':''}>▶ Run coordination cycle</button>
+        <button class="btn btn-sm" id="co-resolve">Mark all findings resolved</button>
+      </div>
+      <div class="coord-out ${co.output?'':'empty'}" id="co-out">${co.busy?'<span class="thinking">ORCHESTRATOR-01 analyzing fleet telemetry</span>':(co.output?esc(co.output):'No briefing yet. Run a coordination cycle and the coordinator will analyze every open finding across all clients and issue prioritized directives.')}</div>`;
+    grid.appendChild(d);
+    d.querySelector('#co-run').onclick = runCoordination;
+    d.querySelector('#co-resolve').onclick = resolveAll;
+  }
+  state.agents.filter(a=>a.type!=='coord').forEach(a=>{
+    const c = clientById(a.clientId);
+    const d = document.createElement('div');
+    d.className='agent';
+    d.innerHTML = `
+      ${a.paused?'':'<div class="scanbar" aria-hidden="true"></div>'}
+      <div class="agent-top">
+        <div>
+          <div class="agent-type ${a.type==='app'?'t-app':'t-work'}">${a.type==='app'?'Application monitor':'Workload monitor'}</div>
+          <div class="agent-name">${esc(a.name)}</div>
+        </div>
+        <span class="status ${a.paused?'s-paused':(a.status==='busy'?'s-busy':'s-active')}">${a.paused?'PAUSED':a.status.toUpperCase()}</span>
+      </div>
+      <div class="target">${c?esc(c.name):'unassigned'} · <span class="mono">${esc(a.target)}</span></div>
+      <div class="last"><b>last:</b> ${esc(a.last)}</div>
+      <div class="row-actions">
+        <button class="btn btn-sm" data-act="pause">${a.paused?'Resume':'Pause'}</button>
+        <button class="btn btn-sm" data-act="retire" style="color:var(--critical);border-color:rgba(255,92,92,.35)">Retire</button>
+      </div>`;
+    d.querySelector('[data-act="pause"]').onclick = ()=>{
+      a.paused=!a.paused;
+      pushFeed('info',a.name, a.paused?'paused by operator':'resumed monitoring');
+      render();
+    };
+    d.querySelector('[data-act="retire"]').onclick = ()=>{
+      state.agents = state.agents.filter(x=>x.id!==a.id);
+      pushFeed('info','SYSTEM',`${a.name} retired from fleet`);
+      render();
+    };
+    grid.appendChild(d);
+  });
+}
+function renderFeed(){
+  const el = $('feed'); el.innerHTML='';
+  state.feed.forEach(r=>{
+    const d = document.createElement('div');
+    d.className='feed-row';
+    const sevLabel = {crit:'CRIT',high:'HIGH',info:'INFO',ok:'OK',coord:'CO·OP'}[r.sev]||'INFO';
+    d.innerHTML = `<span class="t">${r.t}</span><span class="sev sev-${r.sev}">${sevLabel}</span><span class="m">[${esc(r.src)}]${r.cName?' ('+esc(r.cName)+')':''} ${esc(r.msg)}</span>`;
+    el.appendChild(d);
+  });
+}
+function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+/* ---------------- Forms ---------------- */
+$('btn-add-client').onclick = ()=>{ const f=$('client-form'); f.style.display = f.style.display==='none'?'block':'none'; };
+$('cf-save').onclick = ()=>{
+  const name = $('cf-name').value.trim();
+  if(!name) return;
+  addClient(name, $('cf-sector').value.trim()||'General');
+  $('cf-name').value=''; $('cf-sector').value=''; $('client-form').style.display='none';
+  refreshClientSelect();
+};
+$('btn-deploy').onclick = ()=>{
+  refreshClientSelect();
+  const f=$('agent-form'); f.style.display = f.style.display==='none'?'block':'none';
+};
+function refreshClientSelect(){
+  const sel = $('af-client'); sel.innerHTML='';
+  state.clients.forEach(c=>{
+    const o=document.createElement('option'); o.value=c.id; o.textContent='Assign to: '+c.name; sel.appendChild(o);
+  });
+}
+$('af-save').onclick = ()=>{
+  const target = $('af-target').value.trim();
+  const clientId = parseInt($('af-client').value,10);
+  if(!target || !clientId) return;
+  addAgent($('af-type').value, clientId, target);
+  $('af-target').value=''; $('agent-form').style.display='none';
+};
+
+/* ---------------- Boot ---------------- */
+seed();
+pushFeed('ok','SYSTEM','agentic operations console online · 6 agents · 3 clients');
+render();
+</script>
+</body>
+</html>
